@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" xmlns:com="com.*"
+		 paddingLeft="5" paddingRight="5">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.ShareProcessIndex;
+			
+			import mx.core.FlexGlobals;
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			public function load():void {
+				var exists: Boolean = false;
+				for(var i:int=0; i<_app.sharesActive.length; i++){
+					for(var n:int=0; n<numChildren; n++){
+						if(getChildAt(n) is ShareProcessIndex && (getChildAt(n) as ShareProcessIndex).share.id_host_share == _app.sharesActive[i].id_host_share){
+							exists = true;
+							(getChildAt(n) as ShareProcessIndex).share = _app.sharesActive[i];
+							break;
+						}
+					}
+					if(!exists){
+						var sp:ShareProcessIndex = new ShareProcessIndex;
+						addChild(sp);
+						sp.data = _app.sharesActive[i];
+					}
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<!--
+	<mx:List id="lstShares" 
+			 width="100%" height="100%" rowHeight="100"
+			 itemRenderer="com.ShareProcess"
+			 dataProvider="{_app.sharesActive}"
+			 />
+	-->
+	<!--
+	<mx:Repeater id="rptShares" dataProvider="{_app.sharesActive}">
+		<com:ShareProcess width="100%" data="{rptShares.currentItem}"/>
+	</mx:Repeater>
+	-->	
+</mx:VBox>

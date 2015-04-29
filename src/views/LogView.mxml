@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" xmlns:ws="ws.*" xmlns:xt="xt.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.events.WebserviceEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.FlexGlobals;
+			
+			import xt.ComboCheck;
+			
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			[Bindable] private var dataProvider:ArrayCollection = new ArrayCollection;
+			
+			[Bindable] private var hosts:ArrayCollection = new ArrayCollection;
+			[Bindable] private var shares:ArrayCollection = new ArrayCollection;
+			
+			private var selectedHosts:String = '';
+			private var selectedShares:String = '';
+			
+			public function load():void {
+				if(grd == null){
+					callLater(load);
+				}
+				else {
+					srv.getShareLog(_app.Factory.Settings.days_history);
+				}
+			}
+			
+			private function getShareLogResult(event:WebserviceEvent):void {
+				dataProvider.source = event.data as Array;
+				var i:int = 0;
+				
+				// create hosts filter
+				hosts = new ArrayCollection;
+				var hostFound:Boolean = false;
+				selectedHosts = '';
+				
+				for(i=0; i<cbxHost.selectedItems.length; i++){
+					selectedHosts += (selectedHosts == '' ? '' : ',');
+					selectedHosts += cbxHost.selectedItems[i].id_host;
+				}
+				for(i=0; i<dataProvider.length; i++){
+					hostFound = false;
+					for(var h:int=0; h<hosts.length; h++){
+						if(hosts[h].id_host == dataProvider[i].id_host){
+							hostFound = true;
+							break;
+						}
+					}
+					if(!hostFound){
+						hosts.addItem({
+							id_host: dataProvider[i].id_host,
+							host_name: dataProvider[i].host_name
+						});
+					}
+				}
+				cbxHost.dataProvider = hosts;
+				callLater(setSelectedHosts);
+				
+				
+				// create shares filter
+				shares = new ArrayCollection;
+				var shareFound:Boolean = false;
+				selectedShares = '';
+				
+				for(i=0; i<cbxShare.selectedItems.length; i++){
+					selectedShares += (selectedShares == '' ? '' : ',');
+					selectedShares += cbxShare.selectedItems[i].id_share;
+				}
+				for(i=0; i<dataProvider.length; i++){
+					shareFound = false;
+					for(var s:int=0; s<shares.length; s++){
+						if(shares[s].id_share == dataProvider[i].id_share){
+							shareFound = true;
+							break;
+						}
+					}
+					if(!shareFound){
+						shares.addItem({
+							id_share: dataProvider[i].id_share,
+							share_name: dataProvider[i].share_name
+						});
+					}
+				}
+				cbxShare.dataProvider = shares;
+				callLater(setSelectedShares);
+				
+				callLater(filter);
+			}
+			
+			private function setSelectedHosts():void {
+				for(var h:int=0; h<hosts.length; h++){
+					if(selectedHosts == '' || (','+selectedHosts+',').indexOf(',' + hosts[h].id_host + ',') > -1){
+						cbxHost.selectedItems.addItem(hosts[h]);
+					}
+				}
+				callLater(cbxHost.invalidateLabel);
+			}
+			
+			private function setSelectedShares():void {
+				for(var h:int=0; h<shares.length; h++){
+					if(selectedShares == '' || (','+selectedShares+',').indexOf(',' + shares[h].id_share + ',') > -1){
+						cbxShare.selectedItems.addItem(shares[h]);
+					}
+				}
+				callLater(cbxHost.invalidateLabel);
+			}
+			
+			private function filter():void {
+				var i:int = 0;
+				
+				selectedHosts = '';
+				for(i=0; i<cbxHost.selectedItems.length; i++){
+					selectedHosts += (selectedHosts == '' ? '' : ',');
+					selectedHosts += cbxHost.selectedItems[i].id_host;
+				}
+				
+				selectedShares = '';
+				for(i=0; i<cbxShare.selectedItems.length; i++){
+					selectedShares += (selectedShares == '' ? '' : ',');
+					selectedShares += cbxShare.selectedItems[i].id_share;
+				}
+				
+				dataProvider.filterFunction = filterLog;
+				dataProvider.refresh();
+			}
+			
+			private function filterLog(item:Object):Boolean {
+				return (
+					(',' + selectedHosts + ',').indexOf(',' + item.id_host + ',') > -1
+					&&
+					(',' + selectedShares + ',').indexOf(',' + item.id_share + ',') > -1
+					&&
+					(
+						edtFind.text == ''
+						||
+						(
+							item.relative_directory.indexOf(edtFind.text) > -1
+						)
+					)
+				);
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	<ws:WebService id="srv" location="{_app.getWebservicesLocation}" requestTimeout="0"
+				   getShareLog="if(_app.checkNoError(event)) getShareLogResult(event)"
+				   />
+	
+	<mx:HBox width="100%" verticalAlign="middle">
+		<mx:Label text="Host:"/>
+		<xt:ComboCheck id="cbxHost" labelField="host_name" change="callLater(filter)" rowCount="20"
+					   multiLabelField="host_name"/>
+		
+		<mx:Spacer/>
+		
+		<mx:Label text="Share:"/>
+		<xt:ComboCheck id="cbxShare" labelField="share_name" change="callLater(filter)" rowCount="20"
+					   multiLabelField="share_name"/>
+		
+		<mx:Spacer/>
+		
+		<mx:Label text="Find:"/>
+		<mx:TextInput id="edtFind" change="callLater(filter)"/>
+		
+	</mx:HBox>
+	
+	<!--
+	Columns in data:
+	fl.id_file_log,
+	fl.date_log,
+	
+	fl.id_file,
+	f.active as file_active,
+	
+	fl.id_host,
+	h.active as host_active,
+	
+	s.id_share,
+	s.active as share_active,
+	
+	fl.date_log,
+	fl.text_log,
+	
+	fl.size,
+	fl.version,
+	fl.date_last_modified,
+	
+	f.relative_directory,
+	s.name as share_name
+	-->
+	<mx:DataGrid id="grd" dataProvider="{dataProvider}" width="100%" height="100%">
+		<mx:columns>
+			<mx:DataGridColumn headerText="Date" dataField="date_log"/>
+			<mx:DataGridColumn headerText="Share" dataField="share_name"/>
+			<mx:DataGridColumn headerText="File" dataField="relative_directory"/>
+			<mx:DataGridColumn headerText="Size" dataField="size"/>
+			<mx:DataGridColumn headerText="Version" dataField="version"/>
+			<mx:DataGridColumn headerText="Modified" dataField="date_last_modified"/>
+			<mx:DataGridColumn headerText="Log Info" dataField="text_log"/>
+		</mx:columns>
+	</mx:DataGrid>
+	
+</mx:VBox>

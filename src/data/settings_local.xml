@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings>
+	<application>
+		<name>FileRepClient</name>
+		<title>File Replicator</title>
+		<url></url>
+		<sessionProperties>webservicesLocation,webservicesLocation2,hostName</sessionProperties>
+	</application>
+	<webservices>
+		<destination>ColdFusion</destination>
+		<endpoint>http://localhost/flex2gateway/</endpoint>
+		<source>webservices</source>
+		<settings auto="false"></settings>
+		<translations auto="false"></translations>
+		<factoryLookups auto="false" delay="0"></factoryLookups>
+	</webservices>
+	<modules auto="false" delay="2000"/>
+	<air local="true">
+		<updater auto="false">http://85.158.105.136/updater/updater.cfc</updater>
+		<updaterLogger>http://85.158.105.136/updater/log.cfm</updaterLogger>
+	</air>
+</settings>

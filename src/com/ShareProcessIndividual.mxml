@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:ws="ws.*" xmlns:xt="xt.*" width="100%"
+		 paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3"
+		 backgroundColor="#FFFFFF">
+	
+	<mx:Script>
+		<![CDATA[
+			import by.blooddy.crypto.MD5;
+			
+			import com.events.WebserviceEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.ProgressBarMode;
+			import mx.core.FlexGlobals;
+			
+			import utils.FileUtils;
+			
+			public static const STEP_IDLE:String = 'idle';
+			public static const STEP_GETINDEX:String = 'getindex';
+			public static const STEP_COMPARING:String = 'comparing';
+			public static const STEP_TRANSFERRING:String = 'transferring';
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			
+			[Bindable] public var share:Share;
+			
+			
+			private var runTimer:Timer;
+			
+			[Bindable] public var paused:Boolean = false;
+			[Bindable] public var running:Boolean = false;
+			
+			private var localFiles:ArrayCollection;			// all local files
+			private var localFilesChanged:ArrayCollection;	// local files changed after last replication date
+			private var remoteFiles:ArrayCollection;		// all remote files
+			
+			private var currentStep:String = STEP_IDLE;	// steps: idle, getindex, comparing, transferring
+			
+			private var localDir:File;
+			
+			private var currentFileIndex:int = 0;
+			
+			// working copies of file indexes
+			private var tmpLocalFilesChanged:ArrayCollection;
+			private var tmpRemoteFiles:ArrayCollection;
+			
+			// files to up- or download
+			private var changedFiles:ArrayCollection;
+			// files in conflict
+			private var conflictFiles:ArrayCollection;
+			
+			
+			// for downloading
+			
+			private var urlLoader:URLLoader;
+			private var urlStream:URLStream;
+			private var loader:Loader;
+			
+			[Bindable] public var loaderMode:Boolean = true;	// only for jpg, png, gif
+			
+			
+			// for uploading
+			
+			[Bindable] private var cu:ChunkUpload;
+			
+			
+			/*
+			private var urlStream:URLStream;
+			private var _buf:ByteArray;
+			private var _offs:uint;
+			private var _paused:Boolean;
+			private var _intervalId:uint;
+			...
+			private function init():void {
+			_buf = new ByteArray();
+			_offs = 0;
+			
+			var ur:URLRequest = new URLRequest( ... uri ... );
+			urlStream = new URLStream();
+			
+			_paused = false;
+			_intervalId = setInterval(500, partialLoad);
+			}
+			...
+			private function partialLoad():void {
+			var len:uint = urlStream.bytesAvailable;
+			urlStream.readBytes(_buf, _offs, len);
+			_offs += len;
+			
+			if (_paused) {
+			urlStream.close();
+			clearInterval(_intervalId);
+			}
+			}
+			...
+			private function pause():void {
+			_paused = true;
+			}
+			...
+			private function resume():void {
+			var ur:URLRequest = new URLRequest(... uri ...);
+			ur.requestHeaders = [new URLRequestHeader("Range", "bytes=" + _offs + "-")];
+			urlStream.load(ur);
+			_paused = false;
+			_intervalId = setInterval(500, partialLoad);
+			}
+			*/
+			
+			
+			override public function set data(value:Object):void {
+				super.data = value;
+				if(value is Share){
+					share = value as Share;
+				}
+				else {
+					share = new Share(value);
+				}
+				if(share.local_directory != '' && share.local_directory != null){
+					localDir = new File(share.local_directory);
+				}
+				if(share.date_last_replicated == null){
+					share.date_last_replicated = new Date(1970, 0, 1);
+				}
+				
+				if(share.check_on_start){
+					callLater(start);
+				}
+				else if(share.check_period > 0){
+					if(runTimer == null){
+						runTimer = new Timer(share.check_period * 1000, 1);
+						runTimer.addEventListener(TimerEvent.TIMER, runTick, false, 0, true);
+					}
+					runTimer.delay = share.check_period * 1000;
+					runTimer.repeatCount = 1;
+					runTimer.start();
+				}
+				else if(share.check_period == 0){
+					callLater(start);
+				}
+				else {
+					if(runTimer != null){
+						runTimer.stop();
+					}
+				}
+				
+			}
+			
+			private function runTick(event:Event):void {
+				runTimer.stop();
+				if(running){
+					start();
+				}
+			}
+			
+			public function start():void {
+				if(!running){
+					running = true;
+				}
+				if(!paused){
+					paused = false;
+				}
+				if(currentStep == STEP_IDLE){
+					lblStatus.text = 'Getting remote file index...';
+					pbIndeterminate.visible = true;
+					pbManual.visible = pbManual.includeInLayout = false;
+					currentStep = STEP_GETINDEX;
+					srv.getFileIndex(_app.user.id_host, share.id_share, share.date_last_modified, share.cached_index);
+				}
+			}
+			
+			public function stop():void {
+				if(running || paused){
+					running = false;
+					paused = false;
+				}
+			}
+			
+			public function pause():void {
+				if(running){
+					paused = true;
+				}
+			}
+			
+			
+			private function edit():void {
+				_app.showShareConfig(share);
+			}
+			
+			
+			private function getFileIndexResult(event:WebserviceEvent):void {
+				remoteFiles = new ArrayCollection(event.data as Array);
+				tmpRemoteFiles = new ArrayCollection(event.data as Array);
+				changedFiles = new ArrayCollection;
+				
+				lblStatus.text = 'Getting local file index...';
+				
+				if(localDir != null){
+					localFiles = new ArrayCollection;
+					FileUtils.readDirectory(localDir, localFiles, true);
+					
+					//localFilesChanged = FileUtils.filterModifiedAfter(localFiles, share.date_last_replicated);
+					
+					/*
+					pseudo:
+					
+					loop local files:
+						loop remote files:
+							if matched
+								=> compare checksums
+								difference:
+									check date modified local > remote => add change as upload
+									check date modified local < remote => add change as download
+								remove remote file from loop (faster)
+							if no match
+								add change as upload
+					
+					loop remote files (remaining):
+						add change as download
+					
+					download: set date modified
+					upload: calculate checksum and attach
+					
+					*/
+					
+					lblStatus.text = 'Comparing files...';
+					
+					currentStep = STEP_COMPARING;
+					
+					pbIndeterminate.visible = pbIndeterminate.includeInLayout = false;
+					pbManual.visible = pbManual.includeInLayout = true;
+					
+					pbManual.label = 'File 0 of ' + localFiles.length;
+					pbManual.setProgress(0, localFiles.length);
+					
+					currentFileIndex = 0;
+					if(currentFileIndex < localFiles.length){
+						callLater(checkNextFile);
+					}
+					else {
+						for(var i:int=0; i<tmpRemoteFiles.length; i++){
+							var fn:String = String(tmpRemoteFiles[i].nativepath);
+							fn = fn.replace(share.server_directory, '');
+							fn = fn.replace(/\/|\\/g, File.separator);
+							if(fn.charAt(0) == File.separator){
+								fn = fn.substr(1);
+							}
+							var f:File = localDir.resolvePath(fn);
+							// download all
+							changedFiles.addItem({
+								action: 'download',
+								localFile: f,
+								remoteFile: tmpRemoteFiles[i]
+							});
+						}
+						callLater(transferNextFile);
+					}
+				}
+				else {
+					pbIndeterminate.includeInLayout = true;
+					pbManual.visible = pbManual.includeInLayout = false;
+					lblStatus.text = 'Error! Local directory not set';
+				}
+				
+			}
+			
+			private function checkNextFile():void {
+				
+				pbManual.label = 'File ' + (currentFileIndex+1) + ' of ' + localFiles.length;
+				pbManual.setProgress(currentFileIndex + 1, localFiles.length);
+				
+				
+				var f:File = localFiles[currentFileIndex] as File;
+				var found:Boolean = false;
+				var diff:Boolean = false;
+				
+				var i:int = 0;
+				
+				var rm:Number, lm:Number; // remote modified, local modified
+				
+				for(i=0; i<tmpRemoteFiles.length; i++){
+					var r:String = String(tmpRemoteFiles[i].nativepath);
+					r = r.replace(share.server_directory, '');
+					r = r.replace(/\/|\\/g, File.separator);
+					
+					var l:String = f.nativePath;
+					l = l.replace(share.local_directory, '');
+					l = l.replace(/\/|\\/g, File.separator);
+					
+					//rm = tmpRemoteFiles[i].modified;
+					
+					var sp:Array, sp1:Array, sp2:Array; // splitted date - 2013-01-01 12:34:56
+					sp = String(tmpRemoteFiles[i].modified).split(' ');
+					sp1 = sp[0].split('-');
+					sp2 = sp[1].split(':');
+					rm = Math.round((new Date(sp1[0], sp1[1]-1, sp1[2], sp2[0], sp2[1], sp2[2])).time / 1000);
+					
+					lm = Math.round(f.modificationDate.time / 1000);
+					
+					found = false;
+					diff = false;
+					
+					if(r == l){
+						found = true;
+						
+						if(share.compare_checksum){
+							// MD5 requires Flex 3.6
+							var fs:FileStream = new FileStream;
+							var ba:ByteArray = new ByteArray;
+							fs.open(f, FileMode.READ);
+							fs.readBytes(ba, 0, f.size);
+							fs.close();
+							var checksum:String = MD5.hashBytes(ba);
+							
+							if(checksum != tmpRemoteFiles[i].checksum){
+								diff = true;
+							}
+						}
+						
+						if(share.compare_date_modified){
+							if(rm.toFixed(0) != lm.toFixed(0)){
+								diff = true;
+							}
+						}
+						
+						if(diff){
+							if(rm > lm){
+								// download
+								changedFiles.addItem({
+									action: 'download',
+									localFile: f,
+									remoteFile: tmpRemoteFiles[i]
+								});
+							}
+							else if(rm < lm){
+								// upload
+								changedFiles.addItem({
+									action: 'upload',
+									localFile: f,
+									remoteFile: tmpRemoteFiles[i]
+								});
+							}
+						}
+						
+						tmpRemoteFiles.removeItemAt(i);
+						break;
+					}
+				}
+				
+				if(!found){
+					// upload
+					changedFiles.addItem({
+						action: 'upload',
+						localFile: f,
+						remoteFile: null
+					});
+				}
+				
+				if(currentFileIndex < localFiles.length - 1){
+					currentFileIndex++;
+					callLater(checkNextFile);
+				}
+				else {
+					
+					for(i=tmpRemoteFiles.length-1; i>=0; i--){
+						var l2:String = String(tmpRemoteFiles[i].nativepath);
+						l2 = l2.replace(share.server_directory, '');
+						l2 = l2.replace(/\/|\\/g, File.separator);
+						l2 = share.local_directory + l2;
+						
+						f = new File(l2);
+						
+						changedFiles.addItem({
+							action: 'download',
+							localFile: f,
+							remoteFile: tmpRemoteFiles[i]
+						});
+					
+						tmpRemoteFiles.removeItemAt(i);
+						
+					}
+					
+					// complete
+					pbIndeterminate.includeInLayout = true;
+					pbManual.visible = pbManual.includeInLayout = false;
+					lblStatus.text = 'Completed';
+					
+					currentFileIndex = 0;
+					callLater(transferNextFile);
+				}
+			}
+			
+			private function transferNextFile():void {
+				if(currentFileIndex < changedFiles.length){
+					
+					currentStep = STEP_TRANSFERRING;
+					
+					//changedFiles[currentFileIndex];
+					/*{
+						action: 'download',
+						localFile: f,
+						remoteFile: tmpRemoteFiles[i]
+					}*/
+					
+					
+					pbIndeterminate.visible = pbIndeterminate.includeInLayout = false;
+					pbManual.visible = pbManual.includeInLayout = true;
+					
+					pbManual.label = 'File ' + (currentFileIndex + 1) + ' of ' + changedFiles.length;
+					pbManual.setProgress(currentFileIndex + 1, changedFiles.length);
+					
+					pbEvent.visible = pbEvent.includeInLayout = true;
+					
+					
+					var req:URLRequest;
+					
+					if(changedFiles[currentFileIndex].action == 'download'){
+						lblStatus.text = 'Downloading "' + changedFiles[currentFileIndex].remoteFile.nativepath + '"...';
+						
+						if(changedFiles[currentFileIndex].localFile != null){
+							switch((changedFiles[currentFileIndex].localFile as File).extension.replace('.', '').toLowerCase()){
+								case 'jpg':
+								case 'png':
+								case 'gif':
+									//loaderMode = true;
+									break;
+								default:
+									loaderMode = false;
+							}
+						}
+						else {
+							loaderMode = false;
+						}
+						if(loaderMode) {
+							if(loader == null){
+								loader = new Loader;
+								loader.contentLoaderInfo.addEventListener(Event.COMPLETE, onFileDownloadComplete, false, 0, true);
+								loader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, onFileError, false, 0, true);
+								
+							}
+							pbEvent.source = loader;
+							
+							req = new URLRequest( srv.downloadFile(_app.user.id_host, changedFiles[currentFileIndex].remoteFile.id_file) );
+							/*req.requestHeaders = [
+								new URLRequestHeader('Referer', referer)
+							];*/
+							loader.load(req);
+						}
+						else {
+							if(urlLoader == null){
+								urlLoader = new URLLoader;
+								urlLoader.dataFormat = URLLoaderDataFormat.BINARY;
+								urlLoader.addEventListener(Event.COMPLETE, onFileDownloadComplete, false, 0, true);
+								//urlLoader.addEventListener(IOErrorEvent.IO_ERROR, onUrlError, false, 0, true);
+								urlLoader.addEventListener(IOErrorEvent.IO_ERROR, onFileError, false, 0, true);
+								urlLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onFileError, false, 0, true);
+								
+							}
+							pbEvent.source = urlLoader;
+							
+							req = new URLRequest( srv.downloadFile(_app.user.id_host, changedFiles[currentFileIndex].remoteFile.id_file) );
+							/*req.requestHeaders = [
+								new URLRequestHeader('Referer', referer)
+							];*/
+							urlLoader.load(req);
+						}
+					}
+					else {
+						var lblu:String = changedFiles[currentFileIndex].localFile.nativePath;
+						lblu = lblu.replace(share.local_directory, '');
+						lblu = lblu.replace(/\/|\\/g, File.separator);
+						lblStatus.text = 'Uploading "' + lblu + '"...';
+						
+						
+						cu = new ChunkUpload(changedFiles[currentFileIndex].localFile as File, srv.uploadFile(_app.user.id_host, share, changedFiles[currentFileIndex].localFile as File, changedFiles[currentFileIndex].remoteFile));
+						
+						cu.addEventListener(Event.COMPLETE, onFileUploadComplete, false, 0, true);
+						cu.addEventListener(IOErrorEvent.IO_ERROR, onFileError, false, 0, true);
+						
+						pbEvent.source = cu;
+						
+						//TODO: upload here...
+						//currentFileIndex++;
+						//callLater(transferNextFile);
+						
+					}
+					
+				}
+				else {
+					// complete
+					
+					currentStep = STEP_IDLE;
+					
+					if(share.check_period > 0){
+						if(runTimer == null){
+							runTimer = new Timer(share.check_period * 1000, 1);
+							runTimer.addEventListener(TimerEvent.TIMER, runTick, false, 0, true);
+						}
+						runTimer.delay = share.check_period * 1000;
+						runTimer.repeatCount = 1;
+						runTimer.start();
+					}
+					else if(share.check_period == 0){
+						callLater(start);
+					}
+					
+				}
+			}
+			
+			
+			private function onFileError(event:IOErrorEvent):void {
+				currentFileIndex++;
+				callLater(transferNextFile);
+			}
+			
+			private function onFileDownloadComplete(event:Event):void {
+				
+				var fs:FileStream;
+				var err:Boolean = false;
+				
+				/*if(loaderMode){
+					if(loader.contentLoaderInfo.bytes == null){
+						//log('No source set for current image', ERROR);
+						currentFileIndex++;
+						callLater(transferNextFile);
+					}
+					else {
+						var imgByteArray:ByteArray;
+						
+						//encode the bitmapdata object and keep the encoded ByteArray
+						switch(file.extension.replace('.', '').toLowerCase()){
+							case 'jpg':	imgByteArray = jpgenc.encode((loader.content as Bitmap).bitmapData);	break;
+							case 'png':	imgByteArray = pngenc.encode((loader.content as Bitmap).bitmapData);	break;
+							case 'gif':
+								gifenc.start();
+								gifenc.addFrame((loader.content as Bitmap).bitmapData);
+								gifenc.finish();
+								imgByteArray = gifenc.stream;
+								break;
+							default:
+								imgByteArray = new ByteArray;
+								imgByteArray.writeBytes(loader.content as ByteArray);
+						}
+						
+						
+						fs = new FileStream();
+						err = false;
+						try{
+							fs.open(file, FileMode.WRITE);
+							fs.writeBytes(imgByteArray, 0, imgByteArray.length);
+							fs.close();
+						}
+						catch(e:Error){
+							err = true;
+							//edtLog.text += e.message + "\n";
+							dispatch(GrabImageEvent.FILE_ERROR);
+						}
+						
+						if(!err){
+							dispatch(GrabImageEvent.FILE_COMPLETE);
+						}
+					}
+				}
+				else*/ {
+					/*if(urlLoader.data == null){
+						//log('No source set for current image', ERROR);
+						currentFileIndex++;
+						callLater(transferNextFile);
+					}
+					else*/ {
+						err = false;
+						try {
+							fs = new FileStream();
+							fs.open( (changedFiles[currentFileIndex].localFile as File), FileMode.WRITE );
+							//fs.writeBytes( event.target.bytes, 0, event.target.bytes.bytesAvailable );
+							fs.writeBytes(urlLoader.data, 0, urlLoader.data.length );
+							fs.close();
+							
+							var ft:FileTouch = new FileTouch;
+							
+							var ds:String = String(changedFiles[currentFileIndex].remoteFile.modified);
+							if(ds.split('-').length == 3 && ds.split(':').length == 3){
+								var ds1:String = ds.split(' ')[0];
+								var ds2:String = ds.split(' ')[1];
+								var md:Date = new Date(
+									int(ds1.split('-')[0]),
+									int(ds1.split('-')[1])-1,
+									int(ds1.split('-')[2]),
+									int(ds2.split(':')[0]),
+									int(ds2.split(':')[1]),
+									int(ds2.split(':')[2])
+								);
+								ft.setupAndLaunch((changedFiles[currentFileIndex].localFile as File), md);
+							}
+							
+						}
+						catch(e:Error){
+							err = true;
+							//edtLog.text += e.message + "\n";
+							currentFileIndex++;
+							callLater(transferNextFile);
+						}
+						if(!err) {
+							currentFileIndex++;
+							callLater(transferNextFile);
+						}
+						
+					}
+				}
+			}
+			
+			private function onFileUploadComplete(event:Event):void {
+				currentFileIndex++;
+				callLater(transferNextFile);
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	
+	<ws:WebService id="srv" location="{_app.getWebservicesLocation}" requestTimeout="0"
+				   getFileIndex="if(_app.checkNoError(event)) getFileIndexResult(event)"
+				   />
+	
+	
+	<mx:VBox width="100%">
+		<mx:Text text="{share.name}" width="100%"/>
+		<mx:Text id="lblStatus" width="100%"/>
+		<xt:ProgressBarXT id="pbIndeterminate" width="100%" label=" " visible="false" indeterminate="true" />
+		<xt:ProgressBarXT id="pbManual" width="100%" visible="false" includeInLayout="false" mode="manual" />
+		<xt:ProgressBarXT id="pbEvent" width="100%" visible="false" includeInLayout="false" mode="event" label="%1 of %2 (%3%%)"  />
+	</mx:VBox>
+	
+	
+	<mx:VBox width="100%">
+		<mx:Text text="{share.local_directory}" width="100%"/>
+		<mx:Text text="{share.date_last_replicated}" width="100%"/>
+		
+	</mx:VBox>
+	
+	<mx:Button 
+		label="{running ? 'Stop' : 'Run'}" 
+		click="running ? stop() : start()"
+		icon="{running ? Icons.media_stop_red_16 : Icons.media_play_green_16}"
+	/>
+	<!--not supported yet
+	<mx:Button 
+		label="{paused ? 'Resume' : 'Pause'}" 
+		click="running ? start() : pause()"
+		icon="{running ? Icons.media_play_green_16 : Icons.media_pause_16}"
+	/>
+	-->
+	<mx:Button 
+		label="Settings" 
+		click="edit()"
+		/>
+	
+</mx:HBox>

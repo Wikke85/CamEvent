@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" 
+		 horizontalAlign="center" verticalAlign="middle"
+		 horizontalGap="10" verticalGap="10">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			
+			import utils.FormatUtils;
+			
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			public function load():void {
+				if(box == null || _app.shares == null){
+					callLater(load);
+				}
+				else {
+					rpt.dataProvider = _app.shares;
+				}
+			}
+			
+			
+			private function onRepeaterEnded():void {
+				callLater(box.invalidateDisplayList);
+				callLater(box.invalidateSize);
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Label text="Share statistics" width="{Math.max(box.width, 200)}" fontSize="16" fontWeight="bold"/>
+	
+	<mx:Canvas width="{Math.max(box.width, 200)}" height="1" color="#999999"/>
+	
+	<!--
+		total_files:Number
+		total_filesize:Number
+		date_last_modified:Date
+		total_files_inactive:Number
+		total_filesize_inactive:Number
+		hosts_linked:Number
+		hosts_linked_inactive:Number
+	-->
+	
+	<mx:Form id="box"  height="100%" horizontalGap="10" verticalGap="10">
+		<mx:Repeater id="rpt" repeatEnd="callLater(callLater,[onRepeaterEnded])">
+			<mx:FormItem width="100%" label="{rpt.currentItem.name}">
+				<mx:HBox width="100%" paddingBottom="10">
+					<mx:VBox width="100%">
+						<mx:HBox width="100%" verticalAlign="bottom">
+							<mx:Label text="{rpt.currentItem.total_files}" fontSize="14" fontWeight="bold"/>
+							<mx:Label text="Files" fontSize="12"/>
+						</mx:HBox>
+						
+						<mx:HBox width="100%" verticalAlign="bottom">
+							<mx:Label text="in" fontSize="12"/>
+							<mx:Label text="{FormatUtils.filesize(rpt.currentItem.total_filesize).split(' ').slice(0,-1).join(' ')}" fontSize="14" fontWeight="bold"/>
+							<mx:Label text="{FormatUtils.filesize(rpt.currentItem.total_filesize).split(' ').pop()}" fontSize="12"/>
+						</mx:HBox>
+					</mx:VBox>
+					
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label width="100%" text="{rpt.currentItem.hosts_linked}" fontSize="14" fontWeight="bold"/>
+						<mx:Label width="100%" text="Hosts" fontSize="12"/>
+						
+					</mx:HBox>
+					
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label width="100%" text="Last change" fontSize="12"/>
+						<mx:Label width="100%" text="{FormatUtils.formatDate(rpt.currentItem.date_last_modified, 'yyyy/mm/dd hh:mi:ss')}" fontSize="14" fontWeight="bold"/>
+						
+					</mx:HBox>
+				</mx:HBox>
+			</mx:FormItem>
+		</mx:Repeater>
+	</mx:Form>
+	
+	
+</mx:VBox>

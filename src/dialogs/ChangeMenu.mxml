@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" title="Change Menu" 
+	width="500" height="500"
+	paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10" 
+	backgroundColor="#FFFFFF" verticalGap="10"
+	
+	maximizable="false" minimizable="false" resizable="true" transparent="false"
+	systemChrome="{NativeWindowSystemChrome.STANDARD}" type="utility"
+	alwaysInFront="false" showStatusBar="false" 
+	
+	closing="event.preventDefault(); event.stopImmediatePropagation(); visible = false;"
+	>
+	
+	<mx:Metadata>
+		[Event("confirmation")]
+	</mx:Metadata>
+
+	<mx:Script>
+	<![CDATA[
+		import mx.events.DragEvent;
+		import mx.collections.ArrayCollection;
+		
+		[Bindable] private var _app:Catering = Catering(mx.core.Application.application);
+		
+		/**
+		 * item:		menu id 
+		 * description:	label
+		 * separator:	true if is a separator
+		 * icon:		icon class,
+		 * toolTip:		button tooltip
+		 */
+		
+		/* Input values */
+		public var selected:ArrayCollection;
+		public var notSelected:ArrayCollection;
+		
+		/* Output value */
+		public var selectedResult:String = '';
+		
+		public function regetFocus(event:Event):void {
+			if(visible){
+				if(event != null){
+					event.preventDefault();
+					event.stopImmediatePropagation();
+				}
+				//this.setFocus();
+				stage.nativeWindow.orderToFront();
+				activate();
+			}
+		}
+		
+		public function load():void {
+			visible = true;
+			stage.nativeWindow.orderToFront();
+			
+			/*if(lst.dataProvider == null) lst.dataProvider = new ArrayCollection;
+			
+			var i:int = 0;
+			
+			
+			if(aKortFormat != ''){
+				for(i=0; i<dKort.length; i++){
+					if( (';'+aKortFormat+';').indexOf(';'+dKort[i].item+';') != -1 ){//als property in weer te geven lijst moet
+						ArrayCollection(lstKort.dataProvider).addItem( dKort.removeItemAt(i) );
+						load();
+						return;
+					}
+				}
+			}*/
+			
+			setSeparatorIndexes();
+			
+			clearUnusedSeparators();
+			
+			//lst.dataProvider		= selected;
+			//lst.invalidateList();
+			
+			
+			//lstNotUsed.dataProvider	= notSelected;
+			//lstNotUsed.invalidateList();
+			
+		}
+		
+		private function setSeparatorIndexes():void {
+			var separatorIndex:int = 1;
+			var i:int=0;
+			if(lst.dataProvider == null){
+				for(i=0; i<selected.length; i++){
+					//lst.dataProvider.addItem(selected[i]);
+					if( selected[i].separator ){
+						selected.source[i].item = 'Separator' + separatorIndex;
+						separatorIndex++;
+					}
+				}
+				lst.dataProvider = selected;
+			}
+			else {
+				for(i=0; i<lst.dataProvider.length; i++){
+					//lst.dataProvider.addItem(selected[i]);
+					if( lst.dataProvider[i].separator ){
+						lst.dataProvider.source[i].item = 'Separator' + separatorIndex;
+						separatorIndex++;
+					}
+				}
+			}
+			
+			//remove double separators
+			var removing:Boolean = true;
+			while(removing){
+				removing = false;
+				for(i=0; i<lst.dataProvider.length-1; i++){
+					if( lst.dataProvider[i].separator && lst.dataProvider[i+1].separator ){
+						lst.dataProvider.removeItemAt(i+1);
+						removing = true;
+						break;
+					}
+				}
+				
+			}
+			//lst.dataProvider = selected;
+			lst.invalidateList();
+		}
+		
+		private function clearUnusedSeparators():void {
+			var n:int=1;
+			if(lstNotUsed.dataProvider == null){
+				notSelected.addItemAt({
+					item: 'Separator',
+					description: '----- Separator -----',
+					separator: true,
+					icon: null,
+					toolTip: ''
+				}, 0);
+				for(n=1; n<notSelected.length; n++){
+					if( notSelected[n].separator ){
+						notSelected.removeItemAt(n);
+						n--;
+					}
+				}
+				lstNotUsed.dataProvider	= notSelected;
+			}
+			else {
+				lstNotUsed.dataProvider.addItemAt({
+					item: 'Separator',
+					description: '----- Separator -----',
+					separator: true,
+					icon: null,
+					toolTip: ''
+				}, 0);
+				for(n=1; n<lstNotUsed.dataProvider.length; n++){
+					if( lstNotUsed.dataProvider[n].separator ){
+						lstNotUsed.dataProvider.removeItemAt(n);
+						n--;
+					}
+				}
+			}
+			
+			//lstNotUsed.dataProvider	= notSelected;
+			lstNotUsed.invalidateList();
+		}
+		
+		
+		private function confirm():void {
+			/* lists result uitlezen en joinen met ';' */
+			
+			selectedResult = '';
+			
+     		for(var i:int=0; i<lst.dataProvider.length; i++){
+     			var item:String = lst.dataProvider[i].item;
+     			if(selectedResult != '') selectedResult += ',';
+     			if(item.indexOf('Separator') != -1) item = 'Separator';
+     			selectedResult += item;
+     		}
+     		dispatchEvent(new Event('confirmation'));
+     		
+     		visible = false;
+		}
+		
+		private function dragEnd(event:DragEvent):void {
+			setSeparatorIndexes();
+			clearUnusedSeparators();
+			
+		}
+		
+	]]>
+	</mx:Script>
+	
+	<mx:Text htmlText="{_app.Factory.Text.key('subtit_dlg_change_menu')}" 
+		width="100%" />
+	
+	<mx:HBox width="100%">
+		<mx:Label width="100%" text="{_app.Factory.Text.key('subtit_dlg_change_menu_lst_notused')}" textAlign="center" fontWeight="bold"/>
+		<mx:Label width="100%" text="{_app.Factory.Text.key('subtit_dlg_change_menu_lst_used')}" textAlign="center" fontWeight="bold"/>
+	</mx:HBox>
+	
+	<mx:HBox width="100%" height="100%">
+		
+		<mx:List id="lstNotUsed" width="100%" height="100%" labelField="description" 
+			dragEnabled="true" dropEnabled="true" allowMultipleSelection="true" dragMoveEnabled="true"
+			dragComplete="dragEnd(event)"/>
+		
+		<mx:List id="lst" width="100%" height="100%" labelField="description" 
+			dragEnabled="true" dropEnabled="true"  allowMultipleSelection="true" dragMoveEnabled="true"
+			dragComplete="dragEnd(event)"/>
+		
+	</mx:HBox>
+	
+	
+	<mx:HBox width="100%">
+		<mx:Spacer width="100%" />
+		<mx:Button label="Cancel" click="visible = false;"  width="60"/>
+		<mx:Button label="OK" click="confirm()"  width="60"/>
+		
+	</mx:HBox>
+
+</mx:Window>

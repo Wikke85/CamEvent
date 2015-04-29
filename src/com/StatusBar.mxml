@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="20" 
+	backgroundColor="#CCCCCC" horizontalGap="0"
+	borderColor="#000000" borderStyle="solid" borderSides="top" borderThickness="1">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			
+			[Bindable] private var _app:CamEvent = CamEvent(FlexGlobals.topLevelApplication);
+			
+			[Bindable]
+			public function set status(value:String):void {
+				lblStatus.text = value;
+			}
+			public function get status():String {
+				return lblStatus.text;
+			}
+			
+			[Bindable]
+			public function set networkStatus(value:String):void {
+				lblNetworkStatus.text = value;
+			}
+			public function get networkStatus():String {
+				return lblNetworkStatus.text;
+			}
+			
+			public function render():void {
+				//lblNum.visible	= Keyboard.numLock;
+				//lblCaps.visible	= Keyboard.capsLock;
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Label text="WS: {_app.getWebservicesLocation}" />
+	<mx:Canvas width="1" height="100%" backgroundColor="#000000" backgroundAlpha="1" alpha="1"/>
+	
+	<mx:Label id="lblStatus" width="100%" text=" "/>
+	<mx:Canvas width="1" height="100%" backgroundColor="#000000" backgroundAlpha="1" alpha="1"/>
+	
+	<!--
+	<mx:Label id="lblNum" text="NUM" visible="false" width="35" textAlign="center"/>
+	<mx:Canvas width="1" height="100%" backgroundColor="#000000" backgroundAlpha="1" alpha="1"/>
+	
+	<mx:Label id="lblCaps" text="CAPS" visible="false" width="35" textAlign="center"/>
+	<mx:Canvas width="1" height="100%" backgroundColor="#000000" backgroundAlpha="1" alpha="1"/>
+	-->
+	
+	<mx:Label id="lblNetworkStatus" width="130" text=" " textAlign="center"/>
+	
+</mx:HBox>

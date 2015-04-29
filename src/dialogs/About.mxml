@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="400" height="300" title="About the File Replication Client"
+	paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="25" 
+	backgroundColor="#FFFFFF"
+	
+	maximizable="false" minimizable="false" resizable="true" transparent="false"
+	systemChrome="{NativeWindowSystemChrome.STANDARD}" type="utility"
+	alwaysInFront="false" showStatusBar="false" 
+	
+	closing="event.preventDefault(); event.stopImmediatePropagation(); visible = false;" 
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			
+			[Bindable] private var _app:CamEvent = CamEvent(FlexGlobals.topLevelApplication);
+			
+			
+			public function regetFocus(event:Event):void {
+				if(visible){
+					if(event != null){
+						event.preventDefault();
+						event.stopImmediatePropagation();
+					}
+					this.setFocus();
+					stage.nativeWindow.orderToFront();
+					activate();
+				}
+			}
+			
+			public function load():void {
+				visible = true;
+				stage.nativeWindow.orderToFront();
+				
+				callLater(regetFocus,[null]);
+				
+				var d:Date = new Date;
+				
+				lblInfo.htmlText = 
+					'File Replication Client<br>' + 
+					'<br>' +
+					'Version:	 	' + _app.applicationVersion + '<br>' + 
+					//'Build:			' + NativeApplication.nativeApplication.runtimeVersion + '<br>' + 
+					'Patch level: 	' + NativeApplication.nativeApplication.runtimePatchLevel + '<br>' + 
+					'<br>' + 
+					'&#169; 2013' + (d.fullYear != 2013 ? (' - '+d.fullYear) : '') + '<br>' + 
+					'Created by <font color="#0000FF"><a href="http://www.wikke.net"><u>Wikke</u></a></font> (wikke.net)'
+				;
+			}
+			
+			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:VBox width="100%" height="100%" horizontalAlign="center">
+		<mx:Image source="{Icons.sync_48}" height="70"/>
+		<mx:Text id="lblInfo" width="328" height="100%" condenseWhite="false"/>
+	</mx:VBox>
+	
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:Button label="OK" click="visible = false;" width="60"/>
+	</mx:HBox>
+	
+</mx:Window>

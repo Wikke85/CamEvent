@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+
+<!--
+	
+	Menu structure for top menu.
+	Make sure each item has a unique name, or else no correct working can be guaranteed!
+	
+	example of a menu item:
+	<UniqueNameMenu label="label for the menu" 
+		toolTip="the tooltip text" 
+		icon="document_preferences"
+		action="actioncode"
+		enabled="true"
+		icon="some_icon"
+		isSeparator="false"/>
+	
+	all properties are, strictly seen, optional; but for a correct working, you must enter as much as possible,
+	at least label and action are necessary!
+	
+	Changing label and/or toolTip changes the appearance without major impact.
+	
+	A submenu only needs the label property
+	
+	label: string; a label for the menu item
+		if no label is set, the name of the menu item will be used as label
+	toolTip: string; the tooltip text which appears on the menu item if it's an icon
+		if no tooltip is set, the label will be used as tooltip
+	icon: string; the image class name as defined in com.prosteps.Factory.Images
+	action: string; internal command identifier - predefined in Catering.mxml, function 'onMenuSelect'
+	enabled: true or false; set menu item as enabled
+	isSeparator: true or false; if true, every other property is ignored and the menu item appears as a separator
+		(more on separators beneath)
+	
+	Separators:
+	a separator is a thin line between menu items.
+	these can be set on different ways (examples):
+		<Separator />
+		<SeparatorCommand label="-" isSeparator="true"/>
+		<RandomCommand label="label is ignored" isSeparator="true"/>
+	
+-->
+
+	<FileMenu label=" Main ">
+		<!-- 
+		<KassaOverviewCommand label="Kassaoverzicht..." action="overview" enabled="false"/>
+		
+		<EnterOrderCommand label="Bestel eten..." action="do_order" enabled="false"/>
+		
+		<Separator />
+		
+		<EditOrderCommand label="Bekijk bestelling..." action="do_editorder" enabled="false"/>
+		
+		<Separator />
+		
+		<LogoutCommand label="Log Out" enabled="false" action="logout"/>
+		
+		<Separator />
+		-->
+		
+		<HideToTrayCommand label="Hide to System Tray" action="dock" key="h" index="0"/>
+		<ExitCommand label="Exit" action="exit" key="x" index="0"/>
+		
+	</FileMenu>
+	
+	<!--
+	<SessionMenu label=" Session ">
+		
+		<ProfileCommand label="My Profile..." enabled="true" action="myprofile" toolTip="" icon="user1"/>
+		<SettingsCommand label="My Settings..." enabled="true" action="mysettings" toolTip="" icon="user1_preferences"/>
+		
+		<SeparatorItem label="-" isSeparator="true"/>
+		
+		<LogoutCommand label="Log Out" enabled="true" action="logout"/>
+	</SessionMenu>
+	-->
+	
+	<HelpMenu label=" Help ">
+		<AboutCommand label="About..." action="about" toolTip="About Catering" icon="about"/>
+	</HelpMenu>
+	
+	
+</root>

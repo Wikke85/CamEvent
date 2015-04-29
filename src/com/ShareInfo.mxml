@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:ws="ws.*"
+		 paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3"
+		 backgroundColor="#FFFFFF">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.events.WebserviceEvent;
+			
+			import mx.core.FlexGlobals;
+			
+			import utils.FormatUtils;
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			[Bindable] public var share:Share;
+			
+			//private var localDir:File;
+			
+			
+			override public function set data(value:Object):void {
+				super.data = value;
+				if(value is Share){
+					share = value as Share;
+				}
+				else {
+					share = new Share(value);
+				}
+			}
+			
+			
+			private function link():void {
+				if(share.id_host_share > 0){
+					_app.Factory.MsgOkCancel('Remove the link with this share. Are you sure? <br><br>(Your files will remain untouched)', 'Unlink', doRemoveHostShare);
+					
+				}
+				else {
+					_app.showShareConfig(share);
+				}
+			}
+			
+			private function doRemoveHostShare(event:Event):void {
+				srv.removeHostShare(_app.user.id_host, share);
+			}
+			
+			private function removeHostShareResult(event:WebserviceEvent):void {
+				_app.getShares();
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	<ws:WebService id="srv" location="{_app.getWebservicesLocation}" requestTimeout="0"
+				   removeHostShare="if(_app.checkNoError(event)) removeHostShareResult(event)"
+				   />
+	
+	
+	<mx:Text text="{share.name}" width="100%" fontSize="14" fontWeight="bold"/>
+	
+	<mx:HBox width="100%" paddingLeft="20" paddingRight="20">
+		
+		<mx:VBox>
+			<mx:Text text="Server directory:" width="100%"/>
+			<mx:Text text="Local directory:" width="100%"/>
+			<mx:Text text="Linked since:" width="100%"/>
+		</mx:VBox>
+		
+		<mx:VBox paddingRight="50" width="100%" maxWidth="400">
+			<mx:Text text="{share.server_directory}" width="100%"/>
+			<mx:Text text="{share.local_directory}" width="100%"/>
+			<mx:Text text="{FormatUtils.formatDate(share.date_linked_since, 'day dd mmm, yyyy - hh:mi:ss')}" width="100%"/>
+		</mx:VBox>
+		
+		<mx:VBox paddingRight="50" width="100%">
+			<mx:Text text="{share.info}" width="100%"/>
+		</mx:VBox>
+		
+		<mx:Button id="btnLink" visible="{share != null}" 
+			click="link()"
+			label="{share.id_host_share &gt; 0 ? 'Unlink' : 'Link'}" 
+			icon="{share.id_host_share &gt; 0 ? Icons.sync_delete_16 : Icons.sync_add_16}"
+			/>
+		
+	</mx:HBox>
+
+</mx:VBox>

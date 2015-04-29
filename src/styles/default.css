@@ -1,0 +1,9 @@
+
+Application {
+	themeColor: #FF3333;
+}
+
+Label, CheckBox, Text, Button, LinkButton, TextInput, NumericStepper, ComboBox, DataGrid  {
+	fontSize: 9px;
+	themeColor: #FF3333;
+}

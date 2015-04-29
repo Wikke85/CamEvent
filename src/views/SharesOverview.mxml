@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" xmlns:com="com.*"
+		 paddingLeft="5" paddingRight="5">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+		]]>
+	</mx:Script>
+	
+	<!--
+	<mx:List id="lstShares" 
+			 width="100%" height="100%" 
+			 itemRenderer="com.ShareInfo"
+			 dataProvider="{_app.shares}"
+			 />
+	-->
+	
+	<mx:Repeater id="rptShares" dataProvider="{_app.shares}">
+		<com:ShareInfo width="100%" data="{rptShares.currentItem}"/>
+	</mx:Repeater>
+	
+</mx:VBox>

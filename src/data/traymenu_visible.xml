@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+
+	<!--
+	<CateringMenu label="Catering">
+		
+		<KassaOverviewCommand label="Kassaoverzicht..." action="overview" enabled="false"/>
+		
+		<EnterOrderCommand label="Bestel eten..." action="do_order" enabled="false"/>
+		
+		<Separator />
+		
+		<EditOrderCommand label="Bekijk bestelling..." action="do_editorder" enabled="false"/>
+	</CateringMenu>
+	
+	
+	<SessionMenu label="Session">
+		
+		<ProfileCommand label="My Profile..." enabled="true" action="myprofile" toolTip="" icon="user1"/>
+		<SettingsCommand label="My Settings..." enabled="true" action="mysettings" toolTip="" icon="user1_preferences"/>
+		
+		<SeparatorItem label="-" isSeparator="true"/>
+		
+		<LogoutCommand label="Log Out" enabled="true" action="logout"/>
+	</SessionMenu>
+	
+	
+	<Separator />
+	-->
+	
+	<OpenCommand label="Open" action="undock" enabled="false"/>
+	<HideToTrayCommand label="Hide to System Tray" action="dock" />
+	
+	<Separator />
+	
+	<!--
+	<StatusItem label="Initialising..." action="status" enabled="false"/>
+	
+	<Separator />
+	-->
+	
+	<!--
+	<PauseAllCommand label="Pause all" action="pauseall" />
+	<ResumeAllCommand label="Resume all" action="resumeall" enabled="false"/>
+	
+	<Separator />
+	-->
+	
+	<ExitCommand label="Exit" action="exit"/>
+	
+	<AboutCommand label="About..." action="about" icon="about"/>
+	
+</root>

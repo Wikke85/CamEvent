@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Box xmlns:mx="http://www.adobe.com/2006/mxml" height="100%">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			[Bindable] private var _app:Catering = Catering(mx.core.Application.application);
+			
+			[Bindable] private var item:NativeMenuItem = new NativeMenuItem;
+			
+			[Bindable] public var isSeparator:Boolean = false;
+			
+			private var _menuName:String = '';
+			[Bindable]
+			public function set menuName(value:String):void {
+				_menuName = value;
+				commitValues();
+			}
+			public function get menuName():String {
+				return _menuName;
+			}
+			
+			
+			public function commitValues():void {
+				if(_app.mnuMain == null || btn == null || _menuName == '') callLater(commitValues);
+				else {
+					item = _app.mnuMain.getMenuItemByName(_menuName);
+					
+					if(item.isSeparator || isSeparator){
+						isSeparator = true;
+						menuEnabled = true;
+					}
+					else {
+						isSeparator = false;
+						
+						btn.toolTip = item.data.toolTip != null && item.data.toolTip != '' ? item.data.toolTip : item.label.replace('...','');
+						btn.data = item.data;
+						
+						//if(_app.Factory.Settings.show_icons_text){
+							btn.label = item.label
+										.split('...').join('')
+										.split('Manage').join('')
+										.split('current').join('')
+										//.split('My').join('')
+										.split('Show').join('')
+										.split(' send to me').join('')
+									;
+							
+							if(item.label.indexOf('Deliverables') == -1) btn.label = btn.label.split('My').join('');
+							
+							btn.label = btn.label.split('  ').join(' ').split('  ').join(' ');
+						//}
+						
+						var size:String = '48';//_app.Factory.Settings.icon_size.toString();
+						if(size == '16') size = '';
+						else size = '_' + size;
+						
+						
+						if(btn.data.hasOwnProperty('icon') && btn.data.icon != null && btn.data.icon != ''){
+							//btn.setStyle('icon', _app.Factory.Images[btn.data.icon + size]);
+							btn.setStyle('icon', Icons[btn.data.icon + size]);
+						}
+						else {
+							btn.setStyle('icon', null);
+						}
+						
+						dispatchEvent(new Event('enableChange'));
+						
+						menuEnabled = item.enabled;
+					}
+				}
+			}
+			
+			[Bindable] private var menuEnabled:Boolean = false;
+			
+			private function onClick():void {
+				_app.onMenuSelect(null, btn.data.action);
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:LinkButton id="btn" visible="{!isSeparator}" includeInLayout="{!isSeparator}"
+		width="100%" height="100%" labelPlacement="bottom"
+		paddingLeft="1" paddingRight="1"
+		enabled="{menuEnabled}" alpha="{menuEnabled ? 1 : 0.2}" buttonMode="{menuEnabled}"
+		click="onClick()"/>
+
+	<mx:Canvas width="1" height="100%" backgroundColor="#CCCCCC"
+		visible="{isSeparator}" includeInLayout="{isSeparator}" />
+
+</mx:Box>
+

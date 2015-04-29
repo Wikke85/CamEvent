@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" minWidth="400" minHeight="120" title="{aTitle}"
+	paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5" 
+	xmlns:com="com.*"
+	
+	maximizable="false" minimizable="false" resizable="true" transparent="false"
+	systemChrome="{NativeWindowSystemChrome.STANDARD}" type="utility"
+	alwaysInFront="true" showStatusBar="false" 
+	
+	closing="event.preventDefault(); event.stopImmediatePropagation(); visible = false;"
+	>
+	
+	<mx:Metadata>
+		[Event("okEvent")]
+		[Event("cancelEvent")]
+	</mx:Metadata>
+
+	<mx:Script>
+	<![CDATA[
+		import com.TFactory;
+		
+		[Bindable] public var aTitle:String = '';
+		[Bindable] public var aMessage:String = '';
+		[Bindable] public var aInternalMessage:String = '';
+		[Bindable] public var Factory:TFactory;
+		
+		
+		public function set aType(type:String):void {
+			if(beeld == null) callLater(function():void{ aType = type; });
+			else {
+				switch (type.toUpperCase()) {
+					case "WARNING" :
+					case "WAARSCHUWING" :
+						//beeld.source = Factory.Images.WARNING;
+						break;
+					case "ERROR" :
+					case "FOUT" :
+						//beeld.source = Factory.Images.ERROR;
+						break;
+					case "HELP" :
+					case "HELP" :
+						//beeld.source = Factory.Images.HELP;
+						break;
+					case "INFO" :
+					case "INFORMATIE" :
+					case "INFORMATION" :
+						//beeld.source = Factory.Images.INFORMATION;
+						break;
+					case "ABOUT" :
+					case "OVER" :
+						//beeld.source = Factory.Images.ABOUT;
+						break;
+					case "UNKNOWN" :
+					case "ONBEKEND" :
+					default :
+						//beeld.source = Factory.Images.UNKNOWN;
+				}
+			}
+		}
+		
+		public function regetFocus(event:Event=null):void {
+			if(visible){
+				if(event != null){
+					event.preventDefault();
+					event.stopImmediatePropagation();
+				}
+				this.setFocus();
+				stage.nativeWindow.orderToFront();
+				activate();
+			}
+		}
+		
+		private function ok():void {
+			dispatchEvent(new Event("okEvent"));
+			visible = false;
+		}
+		private function cancel():void {
+			dispatchEvent(new Event("cancelEvent"));
+			visible = false;
+		}
+		
+		
+		public function reset():void {
+			visible = true;
+			stage.nativeWindow.orderToFront();
+			
+			callLater(regetFocus,[null]);
+			
+			
+			invalidateSize();
+			callLater(callLater,[callLater,[btnOK.setFocus]]);
+		}
+		
+		
+	]]>
+	</mx:Script>
+	
+	
+	<mx:HBox width="100%" verticalAlign="middle">
+		<mx:Image id="beeld" width="48" height="48" />
+		<mx:Text selectable="false" htmlText="{aMessage}" width="100%" color="#000000" alpha="1"/>
+	</mx:HBox>
+	
+	
+	<mx:HBox width="100%">
+		<mx:Spacer width="100%" />
+		<mx:Button id="btnOK" label="OK" click="ok()" width="60" />
+		<mx:Button label="Cancel" click="cancel()" width="60" />
+	</mx:HBox>
+
+</mx:Window>

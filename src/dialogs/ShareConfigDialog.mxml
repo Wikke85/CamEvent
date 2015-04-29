@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="900" height="600"
+	title="Edit linked share for this computer"
+	paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5" 
+	backgroundColor="#FFFFFF"
+	xmlns:com="com.*"
+	
+	maximizable="false" minimizable="false" resizable="true" transparent="false"
+	systemChrome="{NativeWindowSystemChrome.STANDARD}" type="utility"
+	alwaysInFront="false" showStatusBar="false" 
+	
+	closing="event.preventDefault(); event.stopImmediatePropagation(); visible = false;" xmlns:ws="ws.*" 
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.Share;
+			import com.events.WebserviceEvent;
+			
+			import mx.core.FlexGlobals;
+			import mx.core.mx_internal;
+			
+			import utils.FormatUtils;
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			[Bindable] public var share:Share;
+			
+			private var localDir:File;
+			
+			
+			public function regetFocus(event:Event):void {
+				if(visible){
+					if(event != null){
+						event.preventDefault();
+						event.stopImmediatePropagation();
+					}
+					
+					/*if(event != null && !(event.currentTarget is Project)){
+						this.setFocus();
+					}*/
+					
+					
+					stage.nativeWindow.orderToFront();
+					activate();
+					
+					/*if(dlgUsers != null && dlgUsers.visible){
+						callLater(callLater,[dlgUsers.regetFocus,[event]]);
+					}*/
+					
+				}
+			}
+			
+			public function load(share:Share):void {
+				visible = true;
+				this.share = new Share;
+				this.share = share;
+				
+				callLater(regetFocus,[null]);
+				
+				if(share.check_period >= 0){
+					rbtCheckOnInterval.selected = true;
+					rbtCheckOnDateTime.selected = false;
+				}
+				else {
+					rbtCheckOnInterval.selected = false;
+					rbtCheckOnDateTime.selected = true;
+				}
+				
+			}
+			
+			/*public function unload():void {
+				//if(dlgUsers != null) dlgUsers.stage.nativeWindow.close();
+				
+				stage.nativeWindow.close();
+			}*/
+			
+			
+			private function setDirectory():void {
+				if(share.id_host_share > 0){
+					
+				}
+				else {
+					localDir = File.documentsDirectory;
+					localDir.addEventListener(Event.SELECT, localDirSelected);
+					localDir.browseForDirectory("Select the local directory to replicate the files to");
+				}
+			}
+			
+			private function localDirSelected(event:Event):void {
+				localDir.removeEventListener(Event.SELECT, localDirSelected);
+				share.local_directory = localDir.nativePath;
+			}
+			
+			
+			private function checkDateString(value:String):Boolean {
+				var valid:Boolean = true;
+				
+				if(value.replace(/ /g, '').replace(/,/g, '').replace(/\-/g, '') == ''){
+					valid = false;
+				}
+				else {
+					
+					var v:Array = value.replace(/ /g, '').split(',');
+					
+					for(var i:int=0; i<v.length; i++){
+						// range: 0-2
+						if(v[i].indexOf('-') > 0 && v[i].indexOf('-') < v[i].length - 1){
+							var r:Array = v[i].split('-');
+							if(r.length == 2 && r[0].length > 0 && r[1].length > 0 && r[0].replace(/[0-9]/g, '') == '' && r[1].replace(/[0-9]/g, '') == ''){
+								
+							}
+							else {
+								valid = false;
+							}
+						}
+						// all or division
+						else if(v[i].charAt(0) == '*') {
+							// division: */5
+							if(v[i].length > 2 && v[i].charAt(1) == '/' && String(v[i]).substr(2).replace(/[0-9]/g, '') == ''){
+								
+							}
+							// all
+							else if(v[i].length == 1){
+								
+							}
+							else {
+								valid = false;
+							}
+						}
+						// number
+						else if(v[i].length > 0 && String(v[i]).replace(/[0-9]/g, '') == '') {
+							
+						}
+						else {
+							valid = false;
+						}
+					}
+					
+				}
+				
+				return valid;
+			}
+			
+			
+			private function check():void {
+				if(edtLocalDirectory.text == ''){
+					edtLocalDirectory.errorString = 'Please select a local directory!';
+				}
+				else {
+					edtLocalDirectory.errorString = '';
+				}
+				
+				
+				if(rbtCheckOnDateTime.selected){
+					edtCheckOnDays.errorString = checkDateString(edtCheckOnDays.text) ? '' : 'Enter a valid format';
+					edtCheckOnHours.errorString = checkDateString(edtCheckOnHours.text) ? '' : 'Enter a valid format';
+					edtCheckOnMinutes.errorString = checkDateString(edtCheckOnMinutes.text) ? '' : 'Enter a valid format';
+				}
+				else {
+					edtCheckOnDays.errorString = '';
+					edtCheckOnHours.errorString = '';
+					edtCheckOnMinutes.errorString = '';
+				}
+				
+				
+				var valid:Boolean = 
+					edtLocalDirectory.errorString == ''
+					&&
+					edtCheckOnDays.errorString == ''
+					&&
+					edtCheckOnHours.errorString == ''
+					&&
+					edtCheckOnMinutes.errorString == ''
+				;
+				
+				share.check_period	= edtCheckPeriod.value;
+				share.check_on_start	= edtCheckOnStart.selected;
+				//share.cached_index	= edtCachedIndex.selected;
+				share.max_download_speed	= edtMaxDownloadSpeed.value;
+				
+				share.check_on_days		= edtCheckOnDays.text;
+				share.check_on_hours	= edtCheckOnHours.text;
+				share.check_on_minutes	= edtCheckOnMinutes.text;
+				
+				//share.compare_checksum	= edtCompareChecksum.selected;
+				//share.compare_date_modified	= edtCompareDateModified.selected;
+				
+				share.exclude_extensions	= edtExcludeExtensions.text;
+				share.exclude_directory		= edtExcludeDirectory.text;
+				share.exclude_filename		= edtExcludeFilename.text;
+				
+				if(valid){
+					srv.setShare(_app.user.id_host, share);
+				}
+			}
+			
+			private function setShareResult(event:WebserviceEvent):void {
+				
+				dispatchEvent(new Event('saveClick'));
+				visible = false;
+			}
+			
+		]]>
+	</mx:Script>
+	
+	
+	<ws:WebService id="srv" location="{_app.getWebservicesLocation}" requestTimeout="0"
+				   setShare="if(_app.checkNoError(event)) setShareResult(event)"
+				   />
+	
+	<mx:HBox width="100%" height="100%">
+			
+		<mx:Form width="100%" maxWidth="300" height="100%">
+			
+			<mx:FormHeading label="Share info"/>
+			
+			<mx:FormItem label="Share:" width="100%">
+				<mx:Text text="{share.name}" width="100%" fontWeight="bold"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="Extra info:" width="100%">
+				<mx:Text text="{share.info}" width="100%" fontWeight="bold"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="Server directory:" width="100%">
+				<mx:Text text="{share.server_directory}" width="100%" fontWeight="bold"/>
+			</mx:FormItem>
+			
+			
+			<mx:Canvas width="100%" height="1" backgroundColor="#999999"/>
+			
+			<mx:FormHeading label="Host info"/>
+			
+			<mx:FormItem label="Linked since:" width="100%">
+				<mx:Text text="{FormatUtils.formatDate(share.date_linked_since, 'yyyy/mm/dd hh:mi:ss')}" width="100%" fontWeight="bold"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="Last replicated:" width="100%">
+				<mx:Text text="{FormatUtils.formatDate(share.date_last_replicated, 'yyyy/mm/dd hh:mi:ss')}" width="100%" fontWeight="bold"/>
+			</mx:FormItem>
+			
+		</mx:Form>
+		
+		<mx:TabNavigator id="tn" width="100%" height="100%" creationPolicy="all">
+			<mx:Form label="Settings" width="100%" height="100%">
+				
+				<mx:FormHeading label="Host settings"/>
+				
+				<mx:FormItem label="Directory:" width="100%" direction="horizontal">
+					<mx:TextInput id="edtLocalDirectory" text="{share.local_directory}" width="100%"/>
+					<mx:Button label="..." toolTip="Browse for directory" click="setDirectory()"/>
+				</mx:FormItem>
+				
+				
+				
+				<!--
+				<mx:FormItem label="Use cached index:" width="100%" direction="horizontal">
+				<mx:CheckBox id="edtCachedIndex" selected="{share.cached_index}"
+				label=" (Load the cached, faster index from the server instead of the actual one)"/>
+				</mx:FormItem>
+				-->
+				
+				<mx:FormItem label="Max download speed:" width="100%" direction="horizontal">
+					<mx:HBox width="100%">
+						<mx:NumericStepper id="edtMaxDownloadSpeed" value="{share.max_download_speed}" minimum="-1" maximum="999999"/>
+						<mx:Text selectable="false" width="100%"
+								 text="Kilobytes per second - 0 or -1 for unlimited"/>
+					</mx:HBox>
+				</mx:FormItem>
+				
+				
+				<!--
+				<mx:Canvas width="100%" height="1" backgroundColor="#999999"/>
+				
+				<mx:FormHeading label="Compare by" fontSize="10"/>
+				
+				<mx:FormItem label="Checksum:" width="100%" direction="horizontal">
+				<mx:CheckBox id="edtCompareChecksum" selected="{share.compare_checksum}"
+				label=" (check if a file is changed by doing a checksum on it (MD5))"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="Modification date:" width="100%" direction="horizontal">
+				<mx:CheckBox id="edtCompareDateModified" selected="{share.compare_date_modified}"
+				label=" (check if a file is changed by it's modification date)"/>
+				</mx:FormItem>
+				-->
+				
+				<mx:Spacer height="8"/>
+				
+				
+				<mx:FormHeading label="Interval settings"/>
+				
+				<mx:Text text="This share is currently not scheduled, and must be started manually." fontStyle="italic"
+						 visible="{!edtCheckOnStart.selected || (edtCheckPeriod.value &lt; 0 &amp;&amp; (edtCheckOnDays.text == '' || edtCheckOnHours.text == '' || edtCheckOnMinutes.text == ''))}"/>
+				
+				<mx:FormItem label="Check on startup:" width="100%" direction="horizontal">
+					<mx:CheckBox id="edtCheckOnStart" selected="{share.check_on_start}"
+								 label=" (start replication when the program launches)"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="Check on:" width="100%" direction="horizontal">
+					<mx:RadioButtonGroup id="rbgCheckOn"/>
+					
+					<mx:RadioButton id="rbtCheckOnInterval" groupName="rbgCheckOn" label="Interval"/>
+					<mx:RadioButton id="rbtCheckOnDateTime" groupName="rbgCheckOn" label="Specific times"/>
+				</mx:FormItem>
+				
+				<mx:Spacer height="4"/>
+				
+				<mx:FormItem label="Check every:" width="100%" direction="vertical">
+					<mx:HBox width="100%">
+						<mx:NumericStepper id="edtCheckPeriod" value="{share.check_period}" minimum="-1" maximum="999999" enabled="{rbtCheckOnInterval.selected}"/>
+						<mx:Text selectable="false" width="100%"
+								 text="seconds - 0 for continuous checking (not recommended!) or -1 to disable (manually start replication)"/>
+					</mx:HBox>
+					<!--
+					<mx:Text selectable="false" text="{'(That\'s 1 minute)'}" 
+					visible="{edtCheckPeriod.value == 60}" 
+					includeInLayout="{edtCheckPeriod.value == 60}"/>
+					<mx:Text selectable="false" text="{'(That\'s ' + FormatUtils.formatDate(edtCheckPeriod.value, 'mi %2 and ss %1').replace('%1', 'seconds').replace('%2', 'minutes') + ')'}" 
+					visible="{edtCheckPeriod.value &gt;= 60 &amp;&amp; edtCheckPeriod.value &lt; 60 * 60}" 
+					includeInLayout="{edtCheckPeriod.value &gt;= 60 &amp;&amp; edtCheckPeriod.value &lt; 60 * 60}"/>
+					<mx:Text selectable="false" text="{'(That\'s ' + FormatUtils.formatDate(edtCheckPeriod.value, 'hh %3, mi %2 and ss %1').replace('%1', 'seconds').replace('%2', 'minutes').replace('%3', 'hours') + ')'}" 
+					visible="{edtCheckPeriod.value &gt;= 60 * 60 &amp;&amp; edtCheckPeriod.value &lt; 24 * 60 * 60}" 
+					includeInLayout="{edtCheckPeriod.value &gt;= 60 * 60 &amp;&amp; edtCheckPeriod.value &lt; 24 * 60 * 60}"/>
+					<mx:Text selectable="false" text="{'(That\'s ' + FormatUtils.formatDate(edtCheckPeriod.value, 'dd %4, hh %3, mi %2 and ss %1').replace('%1', 'seconds').replace('%2', 'minutes').replace('%3', 'hours').replace('%4', 'days') + ')'}" 
+					visible="{edtCheckPeriod.value &gt;= 24 * 60 * 60}" 
+					includeInLayout="{edtCheckPeriod.value &gt;= 24 * 60 * 60}"/>
+					-->
+				</mx:FormItem>
+				
+				<mx:Spacer height="4"/>
+				
+				<mx:Text width="100%" text="Enter a combination or combinations (separated by a comma) of:&#xd; - numbers like 2, 4, 6 &#xd; - ranges like 0-3 for values 0, 1, 2 and 3&#xd; - * for all possible values&#xd; - */5 for example for every 5 hours or minutes"/>
+				
+				<mx:FormItem label="Weekdays:" width="100%" >
+					<mx:TextInput id="edtCheckOnDays" width="100%" text="{share.check_on_days}" restrict="0-6 /*,\-" enabled="{rbtCheckOnDateTime.selected}"/>
+					<mx:Text selectable="false" width="100%"
+							 text="0 = sunday, 1 = monday, ..."/>
+					
+				</mx:FormItem>
+				
+				<mx:FormItem label="Hours:" width="100%" >
+					<mx:TextInput id="edtCheckOnHours" width="100%" text="{share.check_on_hours}" restrict="0-9 /*,\-" enabled="{rbtCheckOnDateTime.selected}"/>
+					<mx:Text selectable="false" width="100%"
+							 text="24H format"/>
+					
+				</mx:FormItem>
+				
+				<mx:FormItem label="Minutes:" width="100%" >
+					<mx:TextInput id="edtCheckOnMinutes" width="100%" text="{share.check_on_minutes}" restrict="0-9 /*,\-" enabled="{rbtCheckOnDateTime.selected}"/>
+					
+				</mx:FormItem>
+				
+			</mx:Form>
+			
+			<mx:Form label="Exclusions" width="100%" height="100%">
+				
+				<mx:FormHeading label="Exclude by" fontSize="10"/>
+				
+				<mx:FormItem label="Extensions:" width="100%" direction="vertical">
+					<mx:TextInput id="edtExcludeExtensions" text="{share.exclude_extensions}" width="100%" restrict="0-9a-zA-Z, "
+								  toolTip="Specify comma-separated, case-insensitive, no dots, no asterisks, spaces are ignored - example: lnk, tmp, old"/>
+					<mx:Text width="100%" selectable="false" text="{edtExcludeExtensions.toolTip}"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="Directories:" width="100%" direction="vertical">
+					<mx:TextArea id="edtExcludeDirectory" text="{share.exclude_directory}" width="100%" height="100" 
+								 toolTip="Specify per line, case-sensitive, (part of) a directory name (without filename part)"/>
+					<mx:Text width="100%" selectable="false" text="{edtExcludeDirectory.toolTip}"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="File name:" width="100%" direction="vertical">
+					<mx:TextArea id="edtExcludeFilename" text="{share.exclude_filename}" width="100%" height="100" 
+								 toolTip="Specify per line, case-sensitive, (part of) a file name (without directory part)"/>
+					<mx:Text width="100%" selectable="false" text="{edtExcludeFilename.toolTip}"/>
+				</mx:FormItem>
+				
+				
+			</mx:Form>
+		</mx:TabNavigator>
+		
+			
+	</mx:HBox>
+	
+	<mx:HBox width="100%" horizontalAlign="right">
+		<mx:Button id="btnCancel" label="Cancel" click="visible = false;"/>
+		<mx:Button label="Save and close" click="check()"/>
+	</mx:HBox>
+	
+</mx:Window>

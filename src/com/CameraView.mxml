@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" label="{description}"
+		 xmlns:components="com.bytesol.components.*"
+		 verticalGap="4"
+		 creationComplete="onComplete()">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.bytesol.components.IPCam;
+			
+			import mx.core.FlexGlobals;
+			
+			[Bindable] private var _app:CamEvent = CamEvent(FlexGlobals.topLevelApplication);
+			
+			[Bindable] private var type:String = '';
+			[Bindable] private var description:String = '';
+			[Bindable] private var channel:String = '';
+			[Bindable] private var address:String = '';
+			[Bindable] private var address_fallback:String = '';
+			
+			[Bindable] public var useFallback:Boolean = false;
+			
+			public var isEnabled:Boolean = true;
+			
+			private var cam:IPCam = new IPCam();
+			
+			private var loader:Loader = new Loader();
+			//private var loader:URLLoader = new URLLoader();
+			
+			private var detector:SimpleMotionDetection = new SimpleMotionDetection;
+			
+			private var timer:Timer;
+			
+			private var initCounter:int = 0;
+			
+			private function onComplete():void {
+				
+				cam.addEventListener("image", onImage);
+				cam.addEventListener("error", onError);
+				cam.addEventListener("connect", onConnect);
+				
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, displayImage);
+				loader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, reload);
+				loader.contentLoaderInfo.addEventListener(SecurityErrorEvent.SECURITY_ERROR, reload);
+				loader.contentLoaderInfo.addEventListener(ProgressEvent.PROGRESS, onProgress);
+				/*
+				loader.addEventListener(Event.COMPLETE, displayImage);
+				loader.addEventListener(IOErrorEvent.IO_ERROR, reload);
+				loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, reload);
+				loader.addEventListener(ProgressEvent.PROGRESS, onProgress);
+				*/
+				
+				detector.addEventListener('change', motionHandler, false, 0, true);
+				
+				//timer = new Timer(3000);
+				//timer.addEventListener(TimerEvent.TIMER, onTimerTick, false, 0, true);
+				
+				if(address != ''){
+					callLater(reload);
+				}
+			}
+			
+			override public function set data(value:Object):void {
+				super.data = value;
+				
+				if(value != null){
+					type = value.type;
+					description = value.description;
+					address = value.address;
+					address_fallback = value.address_fallback;
+					channel = value.channel;
+				}
+				else {
+					type = '';
+					description = '';
+					address = '';
+					address_fallback = '';
+					channel = '';
+				}
+				
+				if(address != ''){
+					callLater(reload);
+				}
+			}
+			
+			private function getAddress():String {
+				return useFallback ? address_fallback : address;
+			}
+			
+			
+			public function reload(event:Event = null):void {
+				if(event != null && (event is SecurityErrorEvent || event is IOErrorEvent)){
+					trace('error: ' + event.toString());
+				}
+				if(timer != null && timer.running){
+					timer.stop();
+				}
+				if(type == ''){
+					visible = false;
+					img.visible = img.includeInLayout = false;
+					imgWebcam.visible = imgWebcam.includeInLayout = false;
+					img.source = null;
+					cam.disconnect();
+					imgWebcam.reset();
+				}
+				else if(isEnabled && getAddress() != null){
+					visible = true;
+					if(type.toLowerCase() == 'mjpg' || type.toLowerCase() == 'mjpeg'){
+						if(!imgWebcam.visible){
+							img.visible = img.includeInLayout = false;
+							imgWebcam.visible = imgWebcam.includeInLayout = true;
+							detector.source = imgWebcam;
+							detector.startDetecting();
+							cam.connect(getAddress(), '', '');
+						}
+					}
+					else {
+						if(!img.visible){
+							imgWebcam.visible = imgWebcam.includeInLayout = false;
+							img.visible = img.includeInLayout = true;
+							detector.source = img;
+							detector.stopDetecting();
+						}
+						
+						try {
+							loader.load(new URLRequest('http://' + getAddress() + '/cam_pic.php?time=' + (new Date).time));
+							if(timer != null){
+								timer.start();
+							}
+						}
+						catch(e:Error){
+							
+						}
+					}
+				}
+				else {
+					img.visible = img.includeInLayout = false;
+					imgWebcam.visible = imgWebcam.includeInLayout = false;
+					img.source = null;
+					cam.disconnect();
+					imgWebcam.reset();
+				}
+			}
+			
+			private function displayImage(event:Event):void
+			{
+				var loader:Loader = (event.target as LoaderInfo).loader;
+				img.data   = loader.content;
+				callLater(detector.compareSnapshots);
+				callLater(reload);
+			}
+			
+			private function onProgress(event:ProgressEvent):void {
+				
+			}
+			
+			private function onError(e:Event):void {
+				//log('Webcam Error ', ERROR);
+				if(address_fallback != ''){
+					useFallback = true;
+				}
+			}
+			private function onConnect(e:Event):void {
+				//log('Webcam connected ', STATUS);
+			}
+			private function onImage(e:Event):void {
+				//log('Webcam streaming ', STATUS);
+				imgWebcam.load(cam.image);
+			}
+			
+			
+			private function motionHandler(event:Event):void {
+				bar.setProgress(detector.percentChange * 100, 100);
+				
+				if(detector.percentChange > nsMotionThreshold.value / 100) {
+					
+					/*if(tile.numChildren > 30) {
+						tile.removeAllChildren();
+					}
+					
+					var image:Image = new Image();
+					image.source = new Bitmap(detector.lastSnapshot.clone());
+					image.width =  45;
+					image.height = 35;
+					
+					tile.addChild(image);*/
+					
+					if(_app.started && initCounter >= 2){
+						//_app.orderToFront();
+						
+						if(_app.isDocked){
+							_app.undock();
+							_app.notify();
+						}
+						else {
+							_app.notify();
+						}
+					}
+					bar.setStyle("trackColors", [0xffcccc,0xffcccc]);
+				}
+				else {
+					bar.clearStyle("trackColors");
+				}
+			}
+			
+			private function onTimerTick(event:Event):void {
+				if(address != '' && initCounter < 2){
+					initCounter++;
+				}
+				reload();
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:HBox verticalAlign="middle">
+		<mx:Label text="Motion threshold:" fontSize="9"/>
+		<mx:NumericStepper id="nsMotionThreshold" minimum="0" maximum="100" stepSize="0.1" value="1" fontSize="9"/>
+		<mx:ProgressBar mode="manual" minimum="0" maximum="1" id="bar" fontSize="9"
+						labelPlacement="center" label="Motion: %3%%" width="100%" maxWidth="200" />
+		
+	</mx:HBox>
+	
+	<mx:Image id="img" width="100%" height="100%" scaleContent="true" maintainAspectRatio="true" 
+			  horizontalAlign="center" verticalAlign="middle"
+			  visible="false" includeInLayout="false"
+			 complete="callLater(reload)"
+			 ioError="onError(event); callLater(reload,[event]);"
+			 />
+	
+	<components:MJPG id="imgWebcam" width="100%" height="100%"
+					 visible="false" includeInLayout="false"
+					 backgroundColor="black" backgroundAlpha="1.0" />
+	
+</mx:VBox>

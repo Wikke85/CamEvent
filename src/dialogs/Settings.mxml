@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="400" height="400" 
+	title="Change your settings"
+	paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5" 
+	backgroundColor="#FFFFFF" 
+	
+	maximizable="false" minimizable="false" resizable="true" transparent="false"
+	systemChrome="{NativeWindowSystemChrome.STANDARD}" type="utility"
+	alwaysInFront="false" showStatusBar="false" 
+	
+	closing="event.preventDefault(); event.stopImmediatePropagation(); visible = false;" xmlns:ws="ws.*" 
+	>
+	
+	<mx:Metadata>
+		[Event('saveClick')]
+	</mx:Metadata>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.TSettings;
+			import com.events.WebserviceEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Box;
+			import mx.containers.BoxDirection;
+			import mx.containers.VBox;
+			import mx.controls.CheckBox;
+			import mx.controls.Label;
+			import mx.controls.NumericStepper;
+			import mx.controls.TextInput;
+			import mx.controls.VScrollBar;
+			import mx.core.FlexGlobals;
+			import mx.rpc.events.ResultEvent;
+			
+			import xt.ComboBoxXT;
+			
+			[Bindable] private var _app:FileRepClient = FileRepClient(FlexGlobals.topLevelApplication);
+			
+			public var changedSettings:ArrayCollection;
+			
+			public function regetFocus(event:Event):void {
+				if(visible){
+					if(event != null){
+						event.preventDefault();
+						event.stopImmediatePropagation();
+					}
+					stage.nativeWindow.orderToFront();
+					activate();
+				}
+			}
+			
+			public function load(extraLabel:String = ''):void {
+				visible = true;
+				stage.nativeWindow.orderToFront();
+				
+				changedSettings = new ArrayCollection;
+				
+				txtExtra.text = extraLabel;
+				txtExtra.visible = txtExtra.includeInLayout = extraLabel != '';
+				
+				
+				var itemsUser:Array = [];
+				var items:Array = [];
+				
+				items = _app.Factory.Settings.data;
+				
+				tn.removeAllChildren();
+				
+				var boxMain:VBox = new VBox;
+				var boxConnection:VBox = new VBox;
+				var boxGui:VBox = new VBox;
+				var boxLog:VBox = new VBox;
+				
+				boxMain.label = "Main";
+				boxConnection.label = "Connection";
+				boxGui.label = "GUI";
+				boxLog.label = "Logs";
+				
+				
+				
+				var ns:NumericStepper;
+				var cbx:CheckBox;
+				var box:Box;
+				var lbl:Label;
+				var txt:TextInput;
+				var cbb:ComboBoxXT;
+				
+				var s:String;
+				
+				for(var i:int=0; i<items.length; i++){
+					if(String(items[i].editable).toLowerCase() == 'true' || String(items[i].editable) == '1'){
+						var extra:Object;
+						if(items[i].hasOwnProperty('extra') && items[i].extra != ''){
+							var extra_tmp:Array = String(items[i].extra).split(' ').join('').split(',');
+							extra = new Object;
+							for(var e:int=0; e<extra_tmp.length; e++){
+								extra[extra_tmp[e].split(':')[0]] = extra_tmp[e].split(':')[1];
+							}
+						}
+						else {
+							extra = null;
+						}
+						
+						switch(items[i].edittype){
+							case 'int':
+								box = new Box;
+								box.direction = BoxDirection.HORIZONTAL;
+								box.percentWidth = 100;
+								box.setStyle('paddingLeft', 5);
+								box.setStyle('paddingRight', 5);
+								lbl = new Label;
+								lbl.text = items[i].description;
+								lbl.toolTip = items[i].tooltip;
+								lbl.percentWidth = 100;
+								box.addChild(lbl);
+								ns = new NumericStepper;
+								ns.width = 100;
+								ns.value = items[i].value;
+								if(extra != null){
+									for(s in extra){
+										if(ns[s] is Number)
+											ns[s] = Number(extra[s]);
+										else if(ns[s] is int)
+											ns[s] = int(extra[s]);
+										else if(ns[s] is Boolean)
+											ns[s] = Boolean(extra[s]);
+										else
+											ns[s] = extra[s];
+									}
+								}
+								ns.toolTip = items[i].tooltip;
+								box.addChild(ns);
+								switch(String(items[i].category).toLowerCase()){
+									case _app.Factory.Settings.CAT_LOG.toLowerCase():	boxLog.addChild(box); break;
+									case _app.Factory.Settings.CAT_GUI.toLowerCase():	boxGui.addChild(box); break;
+									case _app.Factory.Settings.CAT_CONNECTION.toLowerCase():	boxConnection.addChild(box); break;
+									case _app.Factory.Settings.CAT_MAIN.toLowerCase():
+									default: boxMain.addChild(box); break;
+								}
+								ns.addEventListener('change', setChanged, false, 0, true);
+								ns.id = items[i].code;
+								break;
+							
+							case 'combo':
+								box = new Box;
+								box.direction = BoxDirection.HORIZONTAL;
+								box.percentWidth = 100;
+								box.setStyle('paddingLeft', 5);
+								box.setStyle('paddingRight', 5);
+								lbl = new Label;
+								lbl.text = items[i].description;
+								lbl.toolTip = items[i].tooltip;
+								lbl.percentWidth = 100;
+								box.addChild(lbl);
+								cbb = new ComboBoxXT;
+								cbb.width = 100;
+								if(extra != null){
+									for(s in extra){
+										if(s == 'dataProvider' && extra[s] == 'PhaseDescriptions'){
+											cbb.dataProvider = 
+											[
+												{status: 'C', description: 'Completed'},
+												{status: 'B', description: 'Active'},
+												{status: 'R', description: 'Reopened'},
+												{status: 'X', description: 'Not applicable'},
+												{status: 'N', description: 'Not completed'}
+											];
+										}
+										else if(s == 'dataProvider' && extra[s] == 'colors'){
+											cbb.dataProvider = 
+											[
+												{color: 'Red'},
+												{color: 'Green'},
+												{color: 'Blue'},
+												{color: 'Yellow'}
+											];
+										}
+										
+										else if(cbb[s] is Number)
+											cbb[s] = Number(extra[s]);
+										else if(cbb[s] is int)
+											cbb[s] = int(extra[s]);
+										else if(cbb[s] is Boolean)
+											cbb[s] = Boolean(extra[s]);
+										else
+											cbb[s] = extra[s];
+									}
+								}
+								cbb.selectedId = items[i].value;
+								cbb.toolTip = items[i].tooltip;
+								box.addChild(cbb);
+								switch(String(items[i].category).toLowerCase()){
+									case _app.Factory.Settings.CAT_LOG.toLowerCase():	boxLog.addChild(box); break;
+									case _app.Factory.Settings.CAT_GUI.toLowerCase():	boxGui.addChild(box); break;
+									case _app.Factory.Settings.CAT_CONNECTION.toLowerCase():	boxConnection.addChild(box); break;
+									case _app.Factory.Settings.CAT_MAIN.toLowerCase():
+									default: boxMain.addChild(box); break;
+								}
+								cbb.addEventListener('change', setChanged, false, 0, true);
+								cbb.id = items[i].code;
+								break;
+							
+							case 'text':
+								box = new Box;
+								box.percentWidth = 100;
+								box.direction = BoxDirection.VERTICAL;
+								box.setStyle('paddingLeft', 5);
+								box.setStyle('paddingRight', 5);
+								box.setStyle('verticalGap',2);
+								lbl = new Label;
+								lbl.text = items[i].description;
+								lbl.toolTip = items[i].tooltip;
+								lbl.percentWidth = 100;
+								box.addChild(lbl);
+								txt = new TextInput;
+								txt.text = items[i].value;
+								txt.toolTip = items[i].tooltip;
+								if(extra != null){
+									for(s in extra){
+										if(txt[s] is Number)
+											txt[s] = Number(extra[s]);
+										else if(txt[s] is int)
+											txt[s] = int(extra[s]);
+										else if(txt[s] is Boolean)
+											txt[s] = Boolean(extra[s]);
+										else
+											txt[s] = extra[s];
+									}
+								}
+								txt.percentWidth = 100;
+								box.addChild(txt);
+								switch(String(items[i].category).toLowerCase()){
+									case _app.Factory.Settings.CAT_LOG.toLowerCase():	boxLog.addChild(box); break;
+									case _app.Factory.Settings.CAT_GUI.toLowerCase():	boxGui.addChild(box); break;
+									case _app.Factory.Settings.CAT_CONNECTION.toLowerCase():	boxConnection.addChild(box); break;
+									case _app.Factory.Settings.CAT_MAIN.toLowerCase():
+									default: boxMain.addChild(box); break;
+								}
+								txt.addEventListener('change', setChanged, false, 0, true);
+								txt.id = items[i].code;
+								break;
+							
+							case 'boolean':
+							default:
+								cbx = new CheckBox;
+								cbx.setStyle('paddingLeft', 5);
+								cbx.setStyle('paddingRight', 5);
+								if(items[i].value is Boolean)
+									cbx.selected = Boolean(items[i].value);
+								else
+									cbx.selected = items[i].value.toLowerCase() == 'true' || items[i].value == '1';
+								cbx.label = items[i].description;
+								cbx.toolTip = items[i].tooltip;
+								if(extra != null){
+									for(s in extra){
+										if(cbx[s] is Number)
+											cbx[s] = Number(extra[s]);
+										else if(cbx[s] is int)
+											cbx[s] = int(extra[s]);
+										else if(cbx[s] is Boolean)
+											cbx[s] = Boolean(extra[s]);
+										else
+											cbx[s] = extra[s];
+									}
+								}
+								cbx.percentWidth = 100;
+								switch(String(items[i].category).toLowerCase()){
+									case _app.Factory.Settings.CAT_LOG.toLowerCase():	boxLog.addChild(cbx); break;
+									case _app.Factory.Settings.CAT_GUI.toLowerCase():	boxGui.addChild(cbx); break;
+									case _app.Factory.Settings.CAT_CONNECTION.toLowerCase():	boxConnection.addChild(box); break;
+									case _app.Factory.Settings.CAT_MAIN.toLowerCase():
+									default: boxMain.addChild(cbx); break;
+								}
+								cbx.addEventListener('change', setChanged, false, 0, true);
+								cbx.id = items[i].code;
+						}
+					}
+				}
+				
+				if(boxMain.numChildren > 0){
+					tn.addChild(boxMain);
+				}
+				if(boxConnection.numChildren > 0){
+					tn.addChild(boxConnection);
+				}
+				if(boxGui.numChildren > 0){
+					tn.addChild(boxGui);
+				}
+				if(boxLog.numChildren > 0){
+					tn.addChild(boxLog);
+				}
+				
+				
+				tn.selectedIndex = 0;
+				tn.invalidateDisplayList();
+				
+				callLater(invalidateSize);
+				
+			}
+			
+			
+			private function setChanged(event:Event):void {
+				
+				var code:String = ''
+				
+				if(event.currentTarget is TextInput) code = event.currentTarget.id;
+				else code = event.target.id;
+				
+				var chVal:Object = '';
+				var chType:String = 'boolean';
+				
+				if(event.target is NumericStepper){
+					chVal = event.target.value;
+					chType = 'int';
+				}
+				else if(event.currentTarget is TextInput){
+					chVal = event.currentTarget.text;
+					chType = 'text';
+				}
+				else if(event.currentTarget is ComboBoxXT){
+					chVal = event.currentTarget.selectedId;
+					chType = 'text';
+				}
+				else {
+					chVal = event.target.selected;
+				}
+				
+				for(var i:int=0; i<changedSettings.length; i++){
+					if(changedSettings[i].code == code && event.target is CheckBox){
+						changedSettings.removeItemAt(i);
+						return;
+					}
+					else if(changedSettings[i].code == code) {
+						changedSettings.setItemAt({
+							code: code,
+							edittype: chType,
+							value: chVal.toString()
+						}, i);
+						return;
+					}
+				}
+				
+				changedSettings.addItem({
+					code: code,
+					edittype: chType,
+					value: chVal.toString()
+				});
+				
+			}
+			
+			private function save():void {
+				
+				for(var i:int=0; i<changedSettings.length; i++){
+					if(changedSettings[i].code == 'hostName' ){
+						_app.hostName = changedSettings[i].value;
+					}
+					else if(changedSettings[i].code == 'webservicesLocation'){
+						_app.webservicesLocation = changedSettings[i].value;
+					}
+					else if(changedSettings[i].code == 'webservicesLocation2'){
+						_app.webservicesLocation2 = changedSettings[i].value;
+					}
+					else {
+						srv.setSetting(
+							_app.user.id_host,
+							changedSettings[i].code, 
+							changedSettings[i].value
+						);
+					}
+				}
+				callLater(_app.getSettings);
+				
+				visible = false; 
+				dispatchEvent(new Event('saveClick')); 
+				
+			}
+			
+			private function setSettingResult(event:WebserviceEvent):void {
+				
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	
+	<ws:WebService id="srv" location="{_app.getWebservicesLocation}" 
+				   setSetting="if(_app.checkNoError(event)) setSettingResult(event)"
+				   />
+	
+	<mx:VBox width="100%" height="100%">
+			
+		
+		<mx:Label htmlText="Settings" fontWeight="bold"/>
+		<mx:Text id="txtExtra" width="100%" visible="false" includeInLayout="false"/>
+		
+		<mx:TabNavigator id="tn" width="100%" height="100%">
+			<!--
+			<mx:VBox id="boxMain" label="Main" width="100%" paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5"
+				borderColor="#CCCCCC" borderStyle="solid" borderThickness="1"></mx:VBox>
+			<mx:VBox id="boxConnection" label="Connection" width="100%" paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5"
+				borderColor="#CCCCCC" borderStyle="solid" borderThickness="1"></mx:VBox>
+			<mx:VBox id="boxGui" label="GUI" width="100%" paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5"
+				borderColor="#CCCCCC" borderStyle="solid" borderThickness="1"></mx:VBox>
+			-->
+		</mx:TabNavigator>
+		
+		
+		<mx:HBox width="100%" horizontalAlign="right" 
+			paddingTop="3" borderColor="#CCCCCC" borderSides="top" borderStyle="solid" borderThickness="1">
+			<mx:Button label="Cancel" click="visible = false;" width="80"/>
+			<mx:Button label="Save and close" click="save();"/>
+		</mx:HBox>
+			
+	</mx:VBox>
+	
+</mx:Window>
